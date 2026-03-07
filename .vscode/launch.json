@@ -1,0 +1,12 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flutter: zipp_flutter",
+      "request": "launch",
+      "type": "dart",
+      "cwd": "${workspaceFolder}/zipp_flutter",
+      "program": "${workspaceFolder}/zipp_flutter/lib/main.dart"
+    }
+  ]
+}
