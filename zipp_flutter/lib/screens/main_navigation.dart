@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import '../theme/app_theme.dart';
 import 'home_screen.dart';
 import 'offers_screen.dart';
@@ -8,6 +7,7 @@ import 'active_ride_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   final String userName;
+  static final ValueNotifier<int> currentTab = ValueNotifier(0);
 
   const MainNavigation({super.key, required this.userName});
 
@@ -16,7 +16,35 @@ class MainNavigation extends StatefulWidget {
 }
 
 class _MainNavigationState extends State<MainNavigation> {
-  int _currentIndex = 0;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = MainNavigation.currentTab.value;
+    MainNavigation.currentTab.addListener(_onGlobalTabChanged);
+  }
+
+  void _onGlobalTabChanged() {
+    if (mounted && _currentIndex != MainNavigation.currentTab.value) {
+      setState(() {
+        _currentIndex = MainNavigation.currentTab.value;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    MainNavigation.currentTab.removeListener(_onGlobalTabChanged);
+    super.dispose();
+  }
+
+  void _onNavItemTapped(int index) {
+    if (_currentIndex != index) {
+      MainNavigation.currentTab.value = index;
+      setState(() => _currentIndex = index);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,7 +101,7 @@ class _MainNavigationState extends State<MainNavigation> {
     final isActive = _currentIndex == index;
 
     return GestureDetector(
-      onTap: () => setState(() => _currentIndex = index),
+      onTap: () => _onNavItemTapped(index),
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),

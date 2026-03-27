@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_card.dart';
+import 'profile_sub_screens.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String userName;
@@ -140,8 +141,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // Responsive helper - scales value based on screen width
+  double _rs(BuildContext context, double value) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    return value * (screenWidth / 390).clamp(0.8, 1.3);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final horizontalPadding = (screenWidth * 0.05).clamp(14.0, 24.0);
+
     final completedRides =
         _rideHistory.where((r) => r['status'] == 'Completed').length;
     final totalSpent = _rideHistory
@@ -155,30 +165,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 16),
+              SizedBox(height: _rs(context, 16)),
 
               // Header
-              Text('My Profile', style: AppTheme.heading1)
+              Text('My Profile', style: AppTheme.heading1.copyWith(
+                fontSize: _rs(context, 28),
+              ))
                   .animate()
                   .fadeIn(duration: 400.ms),
 
-              const SizedBox(height: 24),
+              SizedBox(height: _rs(context, 24)),
 
               // Profile card
               GlassCard(
                 isGlowing: true,
+                padding: EdgeInsets.all(_rs(context, 16)),
                 child: Column(
                   children: [
                     Row(
                       children: [
                         // Avatar
                         Container(
-                          width: 68,
-                          height: 68,
+                          width: _rs(context, 68),
+                          height: _rs(context, 68),
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: LinearGradient(
@@ -191,19 +204,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               color: AppColors.teal.withValues(alpha: 0.6),
                               width: 2.5,
                             ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.teal.withValues(alpha: 0.25),
+                                blurRadius: 16,
+                                spreadRadius: 2,
+                              ),
+                            ],
                           ),
                           child: Center(
                             child: Text(
                               _userName[0].toUpperCase(),
                               style: GoogleFonts.syne(
-                                fontSize: 28,
+                                fontSize: _rs(context, 28),
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.white,
                               ),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 16),
+                        SizedBox(width: _rs(context, 16)),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -213,44 +233,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   children: [
                                     Expanded(
                                       child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12),
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: _rs(context, 12)),
                                         decoration: BoxDecoration(
                                           color: AppColors.surface,
                                           borderRadius:
-                                              BorderRadius.circular(10),
+                                              BorderRadius.circular(_rs(context, 10)),
                                           border: Border.all(
                                             color: AppColors.teal,
                                           ),
                                         ),
                                         child: TextField(
                                           controller: _nameController,
-                                          style: AppTheme.bodyMedium,
+                                          style: AppTheme.bodyMedium.copyWith(
+                                            fontSize: _rs(context, 16),
+                                          ),
                                           autofocus: true,
-                                          decoration: const InputDecoration(
+                                          decoration: InputDecoration(
                                             border: InputBorder.none,
                                             isDense: true,
                                             contentPadding:
                                                 EdgeInsets.symmetric(
-                                                    vertical: 10),
+                                                    vertical: _rs(context, 10)),
                                           ),
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    GestureDetector(
-                                      onTap: _saveName,
-                                      child: Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.teal,
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                        ),
-                                        child: const Icon(
-                                          Icons.check_rounded,
-                                          color: Colors.white,
-                                          size: 18,
+                                    SizedBox(width: _rs(context, 8)),
+                                    Material(
+                                      color: AppColors.teal,
+                                      borderRadius: BorderRadius.circular(_rs(context, 8)),
+                                      child: InkWell(
+                                        onTap: _saveName,
+                                        borderRadius: BorderRadius.circular(_rs(context, 8)),
+                                        splashColor: Colors.white.withValues(alpha: 0.3),
+                                        child: Padding(
+                                          padding: EdgeInsets.all(_rs(context, 8)),
+                                          child: Icon(
+                                            Icons.check_rounded,
+                                            color: Colors.white,
+                                            size: _rs(context, 18),
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -262,46 +285,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     Flexible(
                                       child: Text(
                                         _userName,
-                                        style: AppTheme.heading3,
+                                        style: AppTheme.heading3.copyWith(
+                                          fontSize: _rs(context, 18),
+                                        ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    GestureDetector(
-                                      onTap: () =>
-                                          setState(() => _isEditing = true),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(4),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.teal
-                                              .withValues(alpha: 0.15),
-                                          borderRadius:
-                                              BorderRadius.circular(6),
-                                        ),
-                                        child: const Icon(
-                                          Icons.edit_rounded,
-                                          color: AppColors.teal,
-                                          size: 14,
+                                    SizedBox(width: _rs(context, 8)),
+                                    Material(
+                                      color: AppColors.teal.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(_rs(context, 6)),
+                                      child: InkWell(
+                                        onTap: () =>
+                                            setState(() => _isEditing = true),
+                                        borderRadius: BorderRadius.circular(_rs(context, 6)),
+                                        splashColor: AppColors.teal.withValues(alpha: 0.3),
+                                        child: Padding(
+                                          padding: EdgeInsets.all(_rs(context, 6)),
+                                          child: Icon(
+                                            Icons.edit_rounded,
+                                            color: AppColors.teal,
+                                            size: _rs(context, 14),
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
-                              const SizedBox(height: 4),
+                              SizedBox(height: _rs(context, 4)),
                               Text(
                                 'Member since Mar 2026',
-                                style: AppTheme.bodySmall,
+                                style: AppTheme.bodySmall.copyWith(
+                                  fontSize: _rs(context, 13),
+                                ),
                               ),
-                              const SizedBox(height: 4),
+                              SizedBox(height: _rs(context, 4)),
                               Row(
                                 children: [
-                                  const Icon(Icons.star_rounded,
-                                      color: AppColors.amber, size: 16),
-                                  const SizedBox(width: 4),
+                                  Icon(Icons.star_rounded,
+                                      color: AppColors.amber, size: _rs(context, 16)),
+                                  SizedBox(width: _rs(context, 4)),
                                   Text(
                                     '4.9 rider rating',
                                     style: AppTheme.bodySmall
-                                        .copyWith(color: AppColors.amber),
+                                        .copyWith(
+                                          color: AppColors.amber,
+                                          fontSize: _rs(context, 13),
+                                        ),
                                   ),
                                 ],
                               ),
@@ -317,7 +347,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   .fadeIn(duration: 400.ms)
                   .slideY(begin: 0.1, end: 0),
 
-              const SizedBox(height: 20),
+              SizedBox(height: _rs(context, 20)),
 
               // Stats row
               Row(
@@ -329,7 +359,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     AppColors.teal,
                     0,
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: _rs(context, 12)),
                   _buildStatCard(
                     Icons.currency_rupee_rounded,
                     '₹$totalSpent',
@@ -337,7 +367,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     AppColors.amber,
                     1,
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: _rs(context, 12)),
                   _buildStatCard(
                     Icons.local_offer_rounded,
                     '3',
@@ -348,11 +378,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
 
-              const SizedBox(height: 24),
+              SizedBox(height: _rs(context, 24)),
 
               // Quick settings
-              Text('Settings', style: AppTheme.heading3),
-              const SizedBox(height: 12),
+              Text('Settings', style: AppTheme.heading3.copyWith(
+                fontSize: _rs(context, 18),
+              )),
+              SizedBox(height: _rs(context, 12)),
               _buildSettingTile(
                 Icons.person_outline_rounded,
                 'Personal Info',
@@ -389,20 +421,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 4,
               ),
 
-              const SizedBox(height: 24),
+              SizedBox(height: _rs(context, 24)),
 
               // Ride history
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Ride History', style: AppTheme.heading3),
+                  Text('Ride History', style: AppTheme.heading3.copyWith(
+                    fontSize: _rs(context, 18),
+                  )),
                   Text(
                     '${_rideHistory.length} rides',
-                    style: AppTheme.bodySmall,
+                    style: AppTheme.bodySmall.copyWith(
+                      fontSize: _rs(context, 13),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: _rs(context, 12)),
 
               // Ride history list
               ..._rideHistory.asMap().entries.map((entry) {
@@ -411,168 +447,213 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 final isCancelled = ride['status'] == 'Cancelled';
 
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: GlassCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Date & status
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  padding: EdgeInsets.only(bottom: _rs(context, 12)),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Viewing details for ${ride['from']} to ${ride['to']}', style: AppTheme.body),
+                            backgroundColor: AppColors.card,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            duration: const Duration(seconds: 1),
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(_rs(context, 16)),
+                      splashColor: AppColors.teal.withValues(alpha: 0.08),
+                      highlightColor: AppColors.teal.withValues(alpha: 0.04),
+                      child: GlassCard(
+                        padding: EdgeInsets.all(_rs(context, 16)),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              ride['date'] as String,
-                              style: AppTheme.caption,
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: isCancelled
-                                    ? Colors.red.withValues(alpha: 0.1)
-                                    : AppColors.success.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                ride['status'] as String,
-                                style: AppTheme.caption.copyWith(
-                                  color: isCancelled
-                                      ? Colors.red
-                                      : AppColors.success,
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-
-                        // Route
-                        Row(
-                          children: [
-                            Column(
+                            // Date & status
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
+                                Flexible(
+                                  child: Text(
+                                    ride['date'] as String,
+                                    style: AppTheme.caption.copyWith(
+                                      fontSize: _rs(context, 12),
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
                                 Container(
-                                  width: 10,
-                                  height: 10,
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: _rs(context, 8),
+                                      vertical: _rs(context, 3)),
                                   decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: AppColors.teal,
-                                    border: Border.all(
-                                        color: AppColors.teal, width: 2),
-                                  ),
-                                ),
-                                Container(
-                                  width: 2,
-                                  height: 24,
-                                  color: AppColors.cardBorder,
-                                ),
-                                const Icon(Icons.location_on_rounded,
-                                    color: AppColors.pink, size: 14),
-                              ],
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    ride['from'] as String,
-                                    style: AppTheme.body,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 14),
-                                  Text(
-                                    ride['to'] as String,
-                                    style: AppTheme.body,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  ride['fare'] as String,
-                                  style: AppTheme.heading3.copyWith(
                                     color: isCancelled
-                                        ? AppColors.grey
-                                        : AppColors.teal,
-                                    decoration: isCancelled
-                                        ? TextDecoration.lineThrough
-                                        : null,
+                                        ? Colors.red.withValues(alpha: 0.1)
+                                        : AppColors.success.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(_rs(context, 6)),
                                   ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  ride['distance'] as String,
-                                  style: AppTheme.caption,
+                                  child: Text(
+                                    ride['status'] as String,
+                                    style: AppTheme.caption.copyWith(
+                                      color: isCancelled
+                                          ? Colors.red
+                                          : AppColors.success,
+                                      fontSize: _rs(context, 10),
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
-                          ],
-                        ),
+                            SizedBox(height: _rs(context, 10)),
 
-                        const SizedBox(height: 12),
-                        Container(
-                          height: 1,
-                          color: AppColors.cardBorder.withValues(alpha: 0.5),
-                        ),
-                        const SizedBox(height: 10),
-
-                        // Driver info
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 16,
-                              backgroundColor:
-                                  (ride['color'] as Color).withValues(alpha: 0.2),
-                              child: Text(
-                                (ride['driver'] as String)[0],
-                                style: AppTheme.bodySmall.copyWith(
-                                  color: ride['color'] as Color,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    ride['driver'] as String,
-                                    style: AppTheme.bodySmall
-                                        .copyWith(color: AppColors.white),
-                                  ),
-                                  Text(
-                                    ride['vehicle'] as String,
-                                    style: AppTheme.caption
-                                        .copyWith(fontSize: 10),
-                                  ),
-                                ],
-                              ),
-                            ),
+                            // Route
                             Row(
                               children: [
-                                const Icon(Icons.star_rounded,
-                                    color: AppColors.amber, size: 14),
-                                Text(
-                                  ' ${ride['rating']}',
-                                  style: AppTheme.caption
-                                      .copyWith(color: AppColors.amber),
+                                Column(
+                                  children: [
+                                    Container(
+                                      width: _rs(context, 10),
+                                      height: _rs(context, 10),
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: AppColors.teal,
+                                        border: Border.all(
+                                            color: AppColors.teal, width: 2),
+                                      ),
+                                    ),
+                                    Container(
+                                      width: 2,
+                                      height: _rs(context, 24),
+                                      color: AppColors.cardBorder,
+                                    ),
+                                    Icon(Icons.location_on_rounded,
+                                        color: AppColors.pink, size: _rs(context, 14)),
+                                  ],
+                                ),
+                                SizedBox(width: _rs(context, 10)),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        ride['from'] as String,
+                                        style: AppTheme.body.copyWith(
+                                          fontSize: _rs(context, 14),
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      SizedBox(height: _rs(context, 14)),
+                                      Text(
+                                        ride['to'] as String,
+                                        style: AppTheme.body.copyWith(
+                                          fontSize: _rs(context, 14),
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                SizedBox(width: _rs(context, 8)),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      ride['fare'] as String,
+                                      style: AppTheme.heading3.copyWith(
+                                        color: isCancelled
+                                            ? AppColors.grey
+                                            : AppColors.teal,
+                                        decoration: isCancelled
+                                            ? TextDecoration.lineThrough
+                                            : null,
+                                        fontSize: _rs(context, 18),
+                                      ),
+                                    ),
+                                    SizedBox(height: _rs(context, 4)),
+                                    Text(
+                                      ride['distance'] as String,
+                                      style: AppTheme.caption.copyWith(
+                                        fontSize: _rs(context, 12),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                            const SizedBox(width: 12),
-                            Text(
-                              ride['duration'] as String,
-                              style: AppTheme.caption,
+
+                            SizedBox(height: _rs(context, 12)),
+                            Container(
+                              height: 1,
+                              color: AppColors.cardBorder.withValues(alpha: 0.5),
+                            ),
+                            SizedBox(height: _rs(context, 10)),
+
+                            // Driver info
+                            Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: _rs(context, 16),
+                                  backgroundColor:
+                                      (ride['color'] as Color).withValues(alpha: 0.2),
+                                  child: Text(
+                                    (ride['driver'] as String)[0],
+                                    style: AppTheme.bodySmall.copyWith(
+                                      color: ride['color'] as Color,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: _rs(context, 13),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: _rs(context, 8)),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        ride['driver'] as String,
+                                        style: AppTheme.bodySmall.copyWith(
+                                          color: AppColors.darkGrey,
+                                          fontSize: _rs(context, 13),
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      Text(
+                                        ride['vehicle'] as String,
+                                        style: AppTheme.caption.copyWith(
+                                          fontSize: _rs(context, 10),
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.star_rounded,
+                                        color: AppColors.amber, size: _rs(context, 14)),
+                                    Text(
+                                      ' ${ride['rating']}',
+                                      style: AppTheme.caption.copyWith(
+                                        color: AppColors.amber,
+                                        fontSize: _rs(context, 12),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(width: _rs(context, 12)),
+                                Text(
+                                  ride['duration'] as String,
+                                  style: AppTheme.caption.copyWith(
+                                    fontSize: _rs(context, 12),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 )
@@ -581,36 +662,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     .slideX(begin: 0.05, end: 0);
               }),
 
-              const SizedBox(height: 24),
+              SizedBox(height: _rs(context, 24)),
 
               // Logout button
-              GestureDetector(
-                onTap: () {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                },
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: Colors.red.withValues(alpha: 0.2),
+              Material(
+                color: Colors.red.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(_rs(context, 16)),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  },
+                  borderRadius: BorderRadius.circular(_rs(context, 16)),
+                  splashColor: Colors.red.withValues(alpha: 0.15),
+                  highlightColor: Colors.red.withValues(alpha: 0.08),
+                  child: Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.symmetric(vertical: _rs(context, 16)),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(_rs(context, 16)),
+                      border: Border.all(
+                        color: Colors.red.withValues(alpha: 0.2),
+                      ),
                     ),
-                  ),
-                  child: Center(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.logout_rounded,
-                            color: Colors.red, size: 20),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Log Out',
-                          style: AppTheme.bodyMedium
-                              .copyWith(color: Colors.red),
-                        ),
-                      ],
+                    child: Center(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.logout_rounded,
+                              color: Colors.red, size: _rs(context, 20)),
+                          SizedBox(width: _rs(context, 8)),
+                          Text(
+                            'Log Out',
+                            style: AppTheme.bodyMedium.copyWith(
+                              color: Colors.red,
+                              fontSize: _rs(context, 16),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -618,7 +707,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   .animate(delay: 800.ms)
                   .fadeIn(duration: 400.ms),
 
-              const SizedBox(height: 32),
+              SizedBox(height: _rs(context, 16)),
+
+              // App version
+              Center(
+                child: Text(
+                  'ZIPP v2.1.0 • Made with 💙 in India',
+                  style: AppTheme.caption.copyWith(
+                    fontSize: _rs(context, 11),
+                    color: AppColors.grey.withValues(alpha: 0.6),
+                  ),
+                ),
+              ),
+
+              SizedBox(height: _rs(context, 32)),
             ],
           ),
         ),
@@ -629,30 +731,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildStatCard(
       IconData icon, String value, String label, Color color, int index) {
     return Expanded(
-      child: GlassCard(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('$label details not available yet.', style: AppTheme.body),
+                backgroundColor: AppColors.card,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                duration: const Duration(seconds: 1),
               ),
-              child: Icon(icon, color: color, size: 20),
+            );
+          },
+          borderRadius: BorderRadius.circular(_rs(context, 16)),
+          splashColor: color.withValues(alpha: 0.1),
+          highlightColor: color.withValues(alpha: 0.05),
+          child: GlassCard(
+            padding: EdgeInsets.all(_rs(context, 14)),
+            child: Column(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(_rs(context, 8)),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(_rs(context, 10)),
+                  ),
+                  child: Icon(icon, color: color, size: _rs(context, 20)),
+                ),
+                SizedBox(height: _rs(context, 8)),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    value,
+                    style: AppTheme.heading3.copyWith(
+                      color: color,
+                      fontSize: _rs(context, 16),
+                    ),
+                  ),
+                ),
+                SizedBox(height: _rs(context, 2)),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    style: AppTheme.caption.copyWith(
+                      fontSize: _rs(context, 10),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: AppTheme.heading3.copyWith(color: color, fontSize: 16),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: AppTheme.caption.copyWith(fontSize: 10),
-              textAlign: TextAlign.center,
-            ),
-          ],
+          ),
         ),
       ),
     )
@@ -668,32 +800,89 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildSettingTile(
       IconData icon, String title, String subtitle, Color color, int index) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: GlassCard(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+      padding: EdgeInsets.only(bottom: _rs(context, 8)),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            Widget screen;
+            if (title == 'Personal Info') {
+              screen = PersonalInfoScreen(userName: _userName);
+            } else if (title == 'Payment Methods') {
+              screen = const PaymentMethodsScreen();
+            } else if (title == 'Safety') {
+              screen = const SafetyScreen();
+            } else if (title == 'Notifications') {
+              screen = const NotificationsScreen();
+            } else if (title == 'Help & Support') {
+              screen = const HelpSupportScreen();
+            } else {
+              // Fallback shouldn't usually hit, but just in case
+              screen = const Scaffold(body: Center(child: Text('Coming Soon!')));
+            }
+
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => screen,
               ),
-              child: Icon(icon, color: color, size: 20),
+            );
+          },
+          borderRadius: BorderRadius.circular(_rs(context, 16)),
+          splashColor: color.withValues(alpha: 0.1),
+          highlightColor: color.withValues(alpha: 0.05),
+          child: GlassCard(
+            padding: EdgeInsets.symmetric(
+              horizontal: _rs(context, 14),
+              vertical: _rs(context, 14),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: AppTheme.bodyMedium),
-                  Text(subtitle, style: AppTheme.caption),
-                ],
-              ),
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(_rs(context, 10)),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(_rs(context, 10)),
+                    border: Border.all(
+                      color: color.withValues(alpha: 0.15),
+                      width: 1,
+                    ),
+                  ),
+                  child: Icon(icon, color: color, size: _rs(context, 20)),
+                ),
+                SizedBox(width: _rs(context, 14)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: AppTheme.bodyMedium.copyWith(
+                          fontSize: _rs(context, 15),
+                        ),
+                      ),
+                      SizedBox(height: _rs(context, 2)),
+                      Text(
+                        subtitle,
+                        style: AppTheme.caption.copyWith(
+                          fontSize: _rs(context, 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: EdgeInsets.all(_rs(context, 6)),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(_rs(context, 8)),
+                  ),
+                  child: Icon(Icons.chevron_right_rounded,
+                      color: color.withValues(alpha: 0.6), size: _rs(context, 20)),
+                ),
+              ],
             ),
-            Icon(Icons.chevron_right_rounded,
-                color: AppColors.grey, size: 22),
-          ],
+          ),
         ),
       ),
     )

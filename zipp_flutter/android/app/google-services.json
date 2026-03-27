@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "88691864012",
+    "project_id": "zippapp-db",
+    "storage_bucket": "zippapp-db.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:88691864012:android:9b188d4e1baa0eb3416d69",
+        "android_client_info": {
+          "package_name": "com.example.zipp_flutter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAM6icvnZf6Qh9kVGe59zfJIx4uB__LYbk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

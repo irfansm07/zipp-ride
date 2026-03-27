@@ -3,6 +3,10 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_card.dart';
 
+class RideState {
+  static final ValueNotifier<bool> hasActiveRide = ValueNotifier(false);
+}
+
 class ActiveRideScreen extends StatefulWidget {
   const ActiveRideScreen({super.key});
 
@@ -13,7 +17,6 @@ class ActiveRideScreen extends StatefulWidget {
 class _ActiveRideScreenState extends State<ActiveRideScreen>
     with TickerProviderStateMixin {
   late AnimationController _mapLineController;
-  bool _hasActiveRide = false;
 
   @override
   void initState() {
@@ -22,10 +25,16 @@ class _ActiveRideScreenState extends State<ActiveRideScreen>
       vsync: this,
       duration: const Duration(seconds: 3),
     )..repeat();
+    RideState.hasActiveRide.addListener(_onRideStateChanged);
+  }
+
+  void _onRideStateChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    RideState.hasActiveRide.removeListener(_onRideStateChanged);
     _mapLineController.dispose();
     super.dispose();
   }
@@ -41,7 +50,7 @@ class _ActiveRideScreenState extends State<ActiveRideScreen>
         centerTitle: true,
       ),
       body: SafeArea(
-        child: _hasActiveRide ? SingleChildScrollView(
+        child: RideState.hasActiveRide.value ? SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -377,80 +386,80 @@ class _ActiveRideScreenState extends State<ActiveRideScreen>
               // Cancel Button
               Center(
                 child: TextButton.icon(
-                  onPressed: () {
-                    // Simulating cancellation
-                    setState(() => _hasActiveRide = false);
-                  },
-                  icon: const Icon(Icons.cancel_outlined, color: Colors.red),
-                  label: const Text('Cancel Ride', style: TextStyle(color: Colors.red, fontSize: 16)),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    backgroundColor: Colors.red.withValues(alpha: 0.1),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ).animate(delay: 500.ms).fadeIn(),
-              
-              const SizedBox(height: 40),
-            ],
-          ),
-        ) : _buildNoRideView(),
-      ),
-    );
-  }
-
-  Widget _buildNoRideView() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: AppColors.teal.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.directions_car_rounded,
-                size: 64,
-                color: AppColors.teal,
-              ),
-            ).animate(onPlay: (c) => c.repeat(reverse: true)).scale(
-                  begin: const Offset(1, 1),
-                  end: const Offset(1.1, 1.1),
-                  duration: const Duration(seconds: 2),
-                ),
-            const SizedBox(height: 24),
-            Text('No active rides', style: AppTheme.heading2),
-            const SizedBox(height: 8),
-            Text(
-              'There are 12+ cabs available near you right now. Ready to book?',
-              style: AppTheme.body.copyWith(color: AppColors.grey),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
                 onPressed: () {
-                  setState(() => _hasActiveRide = true);
+                  // Simulating cancellation
+                  RideState.hasActiveRide.value = false;
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.teal,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
+                icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+                label: const Text('Cancel Ride', style: TextStyle(color: Colors.red, fontSize: 16)),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  backgroundColor: Colors.red.withValues(alpha: 0.1),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: Text('Book a Ride',
-                    style: AppTheme.button.copyWith(color: AppColors.background)),
               ),
-            ).animate().fadeIn(delay: 200.ms),
+            ).animate(delay: 500.ms).fadeIn(),
+            
+            const SizedBox(height: 40),
           ],
         ),
+      ) : _buildNoRideView(),
+    ),
+  );
+}
+
+Widget _buildNoRideView() {
+  return Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppColors.teal.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.directions_car_rounded,
+              size: 64,
+              color: AppColors.teal,
+            ),
+          ).animate(onPlay: (c) => c.repeat(reverse: true)).scale(
+                begin: const Offset(1, 1),
+                end: const Offset(1.1, 1.1),
+                duration: const Duration(seconds: 2),
+              ),
+          const SizedBox(height: 24),
+          Text('No active rides', style: AppTheme.heading2),
+          const SizedBox(height: 8),
+          Text(
+            'There are 12+ cabs available near you right now. Ready to book?',
+            style: AppTheme.body.copyWith(color: AppColors.grey),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 32),
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton(
+              onPressed: () {
+                RideState.hasActiveRide.value = true;
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.teal,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: Text('Book a Ride',
+                  style: AppTheme.button.copyWith(color: AppColors.background)),
+            ),
+          ).animate().fadeIn(delay: 200.ms),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

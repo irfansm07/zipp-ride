@@ -3,8 +3,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../widgets/glass_card.dart';
-import '../widgets/gradient_button.dart';
-import '../models/ride_model.dart';
+import '../services/alternative_train_service.dart';
+import 'main_navigation.dart';
+import 'active_ride_screen.dart';
 
 class PnrBookingScreen extends StatefulWidget {
   const PnrBookingScreen({super.key});
@@ -14,23 +15,36 @@ class PnrBookingScreen extends StatefulWidget {
 }
 
 class _PnrBookingScreenState extends State<PnrBookingScreen> {
-  final _pnrController = TextEditingController();
+  final _trainController = TextEditingController();
+  final _pickupStationController = TextEditingController();
+  final _destinationController = TextEditingController();
   bool _isTracking = false;
   bool _showStatus = false;
-  int _selectedCategoryIndex = -1;
-  final _categories = getRideCategories();
+  Map<String, dynamic>? _trainData;
+  final TrainService _trainService = TrainService();
+  String _requestStatus = 'No request sent yet.';
+  String _passengerNotification =
+      'No updates yet. Search your train to send a cab request.';
+  int? _etaToSelectedDestinationMin;
+  String _etaArrivalText = '--:--';
 
   @override
   void dispose() {
-    _pnrController.dispose();
+    _trainController.dispose();
+    _pickupStationController.dispose();
+    _destinationController.dispose();
     super.dispose();
   }
 
-  void _trackPnr() async {
-    if (_pnrController.text.length < 10) {
+  void _trackTrain() async {
+    if (_trainController.text.length < 5 ||
+        _pickupStationController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Please enter a valid 10-digit PNR', style: AppTheme.body),
+          content: Text(
+            'Please enter train number and pickup station',
+            style: AppTheme.body,
+          ),
           backgroundColor: AppColors.card,
         ),
       );
@@ -42,91 +56,120 @@ class _PnrBookingScreenState extends State<PnrBookingScreen> {
       _showStatus = false;
     });
 
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      // Call real API to get train live status
+      final trainData = await _trainService.getLiveTrainStatus(_trainController.text);
+      
+      if (trainData != null) {
+        setState(() {
+          _trainData = trainData;
+          _showStatus = true;
+          _requestStatus =
+              'Request sent to nearby drivers in driver app for ${_pickupStationController.text.trim()}.';
+          _passengerNotification =
+              'Searching nearby drivers for Train ${_trainController.text.trim()} pickup at ${_pickupStationController.text.trim()}...';
+        });
+        _updateSelectedDestinationEta();
+
+        Future.delayed(const Duration(seconds: 2), () {
+          if (!mounted || !_showStatus) return;
+          
+          setState(() {
+            _requestStatus = 'Driver assigned';
+            _passengerNotification =
+                'Driver assigned. Navigating to My Ride...';
+          });
+          
+          Future.delayed(const Duration(seconds: 1), () {
+            if (!mounted) return;
+            RideState.hasActiveRide.value = true;
+            MainNavigation.currentTab.value = 1;
+            Navigator.pop(context);
+          });
+        });
+      } else {
+        throw Exception('Unable to fetch train data');
+      }
+    } catch (e) {
+      debugPrint('Error tracking train: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Live status unavailable. Check train number/API key or provider subscription and retry.',
+              style: AppTheme.body,
+            ),
+            backgroundColor: AppColors.card,
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: AppColors.teal,
+              onPressed: _trackTrain,
+            ),
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isTracking = false;
+      });
+    }
+  }
+
+  void _updateSelectedDestinationEta() {
+    if (_trainData == null) return;
+    final selectedDestination = _destinationController.text.trim();
+    if (selectedDestination.isEmpty) {
+      setState(() {
+        _etaToSelectedDestinationMin = null;
+        _etaArrivalText = '--:--';
+      });
+      return;
+    }
+
+    // Estimate ETA for selected destination.
+    // If selected destination matches train destination, use arrival time if parseable.
+    final trainDestination =
+        (_trainData!['destinationName'] ?? _trainData!['destination'] ?? '')
+            .toString()
+            .toLowerCase();
+    final userDestination = selectedDestination.toLowerCase();
+    final delay = (_trainData!['delay'] as int?) ?? 0;
+
+    int etaMin;
+    if (trainDestination.isNotEmpty &&
+        (trainDestination.contains(userDestination) ||
+            userDestination.contains(trainDestination))) {
+      etaMin = _minutesUntilTimeString((_trainData!['arrivalTime'] ?? '').toString()) ??
+          (30 + delay);
+    } else {
+      // For intermediate/other stops, keep practical estimate with delay adjustment.
+      etaMin = 18 + delay;
+    }
+    if (etaMin < 1) etaMin = 1;
+
+    final etaArrival = DateTime.now().add(Duration(minutes: etaMin));
+    final hh = etaArrival.hour.toString().padLeft(2, '0');
+    final mm = etaArrival.minute.toString().padLeft(2, '0');
 
     setState(() {
-      _isTracking = false;
-      _showStatus = true;
+      _etaToSelectedDestinationMin = etaMin;
+      _etaArrivalText = '$hh:$mm';
     });
   }
 
-  void _scheduleCab() {
-    if (_selectedCategoryIndex == -1) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Please select a ride type first', style: AppTheme.body),
-          backgroundColor: AppColors.card,
-        ),
-      );
-      return;
+  int? _minutesUntilTimeString(String value) {
+    if (value.isEmpty || !value.contains(':')) return null;
+    final parts = value.split(':');
+    if (parts.length != 2) return null;
+    final h = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    if (h == null || m == null) return null;
+    final now = DateTime.now();
+    var target = DateTime(now.year, now.month, now.day, h, m);
+    if (target.isBefore(now)) {
+      target = target.add(const Duration(days: 1));
     }
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => _buildSuccessDialog(ctx),
-    );
-  }
-
-  Widget _buildSuccessDialog(BuildContext ctx) {
-    final rideType = _categories[_selectedCategoryIndex].name;
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.all(20),
-      child: GlassCard(
-        isGlowing: true,
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.success.withValues(alpha: 0.1),
-                border: Border.all(
-                  color: AppColors.success,
-                  width: 2,
-                ),
-              ),
-              child: const Icon(
-                Icons.schedule_rounded,
-                color: AppColors.success,
-                size: 40,
-              ),
-            )
-                .animate()
-                .scale(
-                  begin: const Offset(0.3, 0.3),
-                  end: const Offset(1, 1),
-                  duration: 600.ms,
-                  curve: Curves.elasticOut,
-                )
-                .fadeIn(),
-            const SizedBox(height: 20),
-            Text(
-              'Driver Scheduled!',
-              style: AppTheme.heading2,
-            ).animate(delay: 200.ms).fadeIn(),
-            const SizedBox(height: 12),
-            Text(
-              'Your $rideType will be waiting at KSR Bengaluru Station exactly when your train arrives. We will adjust the pickup automatically if your train is delayed.',
-              style: AppTheme.body.copyWith(color: AppColors.grey),
-              textAlign: TextAlign.center,
-            ).animate(delay: 300.ms).fadeIn(),
-            const SizedBox(height: 24),
-            GradientButton(
-              text: 'Done',
-              onPressed: () {
-                Navigator.pop(ctx);
-                Navigator.pop(context);
-              },
-            ).animate(delay: 400.ms).fadeIn().slideY(begin: 0.2, end: 0),
-          ],
-        ),
-      ),
-    );
+    return target.difference(now).inMinutes;
   }
 
   @override
@@ -137,7 +180,7 @@ class _PnrBookingScreenState extends State<PnrBookingScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.white),
+          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.darkGrey),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text('No Delay Cab', style: AppTheme.heading3),
@@ -181,7 +224,7 @@ class _PnrBookingScreenState extends State<PnrBookingScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Enter your PNR to auto-sync your cab pickup time with your train arrival. Never wait for a cab at the station again!',
+                      'Enter your train number to track live location and schedule your cab pickup. We will adjust the pickup automatically if your train is delayed!',
                       style: AppTheme.bodySmall.copyWith(color: AppColors.grey),
                       textAlign: TextAlign.center,
                     ),
@@ -191,8 +234,8 @@ class _PnrBookingScreenState extends State<PnrBookingScreen> {
 
               const SizedBox(height: 32),
 
-              // PNR Input
-              Text('Enter 10-digit PNR Number', style: AppTheme.bodyMedium),
+              // Train Number Input
+              Text('Enter Train Number', style: AppTheme.bodyMedium),
               const SizedBox(height: 12),
               Container(
                 decoration: BoxDecoration(
@@ -201,31 +244,28 @@ class _PnrBookingScreenState extends State<PnrBookingScreen> {
                   border: Border.all(color: AppColors.cardBorder),
                 ),
                 child: TextField(
-                  controller: _pnrController,
-                  keyboardType: TextInputType.number,
-                  maxLength: 10,
+                  controller: _trainController,
+                  keyboardType: TextInputType.text,
+                  textCapitalization: TextCapitalization.characters,
                   style: GoogleFonts.dmSans(
-                    fontSize: 20,
+                    fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: 4,
-                    color: AppColors.white,
+                    color: AppColors.darkGrey,
                   ),
                   decoration: InputDecoration(
-                    hintText: 'XXXXXXXXXX',
+                    hintText: 'e.g., 12628',
                     hintStyle: GoogleFonts.dmSans(
-                      fontSize: 20,
+                      fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: 4,
                       color: AppColors.grey.withValues(alpha: 0.5),
                     ),
-                    counterText: '',
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 20,
                       vertical: 16,
                     ),
                     prefixIcon: const Icon(
-                      Icons.confirmation_num_rounded,
+                      Icons.train_rounded,
                       color: AppColors.teal,
                     ),
                   ),
@@ -234,12 +274,41 @@ class _PnrBookingScreenState extends State<PnrBookingScreen> {
 
               const SizedBox(height: 24),
 
+              Text('Pickup Station', style: AppTheme.bodyMedium),
+              const SizedBox(height: 12),
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.cardBorder),
+                ),
+                child: TextField(
+                  controller: _pickupStationController,
+                  style: AppTheme.bodyMedium,
+                  decoration: InputDecoration(
+                    hintText: 'e.g., Chennai Central',
+                    hintStyle: AppTheme.bodySmall.copyWith(color: AppColors.grey),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
+                    prefixIcon: const Icon(
+                      Icons.location_on_rounded,
+                      color: AppColors.teal,
+                    ),
+                  ),
+                ),
+              ).animate(delay: 250.ms).fadeIn(),
+
+              const SizedBox(height: 24),
+
               if (!_showStatus)
                 SizedBox(
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: _isTracking ? null : _trackPnr,
+                    onPressed: _isTracking ? null : _trackTrain,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.surface,
                       shape: RoundedRectangleBorder(
@@ -257,7 +326,7 @@ class _PnrBookingScreenState extends State<PnrBookingScreen> {
                             ),
                           )
                         : Text(
-                            'Track Status',
+                            'Track Train',
                             style: AppTheme.button.copyWith(color: AppColors.teal),
                           ),
                   ),
@@ -273,7 +342,7 @@ class _PnrBookingScreenState extends State<PnrBookingScreen> {
                   isGlowing: true,
                   child: Column(
                     children: [
-                      // Train Name
+                      // Train Name and Number
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -282,7 +351,7 @@ class _PnrBookingScreenState extends State<PnrBookingScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  '12628 - Karnataka Express',
+                                  '${_trainData!['trainNumber']} - ${_trainData!['trainName']}',
                                   style: AppTheme.heading3,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -291,13 +360,19 @@ class _PnrBookingScreenState extends State<PnrBookingScreen> {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: Colors.red.withValues(alpha: 0.1),
+                                    color: _trainData!['delay'] > 0 
+                                        ? Colors.red.withValues(alpha: 0.1)
+                                        : Colors.green.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
-                                    'Delayed by 45 mins',
+                                    _trainData!['delay'] > 0 
+                                        ? 'Delayed by ${_trainData!['delay']} mins'
+                                        : 'On Time',
                                     style: AppTheme.caption.copyWith(
-                                        color: Colors.red,
+                                        color: _trainData!['delay'] > 0 
+                                            ? Colors.red
+                                            : Colors.green,
                                         fontWeight: FontWeight.bold),
                                   ),
                                 ),
@@ -306,7 +381,92 @@ class _PnrBookingScreenState extends State<PnrBookingScreen> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 16),
+                      
+                      // Live Location Section
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.teal.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.location_on_rounded, 
+                                       color: AppColors.teal, size: 16),
+                                const SizedBox(width: 4),
+                                Text('Live Location', style: AppTheme.bodySmall.copyWith(
+                                  color: AppColors.teal,
+                                  fontWeight: FontWeight.bold,
+                                )),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _trainData!['currentLocation'],
+                              style: AppTheme.bodyMedium.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              'Next: ${_trainData!['nextStation']}',
+                              style: AppTheme.bodySmall.copyWith(color: AppColors.grey),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Updated: ${_trainData!['lastUpdated'] ?? 'Just now'}'
+                              '${_trainData!['dataSource'] != null ? ' · ${_trainData!['dataSource']}' : ''}',
+                              style: AppTheme.caption.copyWith(color: AppColors.grey),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Train Details
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Platform', style: AppTheme.caption),
+                                Text(_trainData!['platform'], 
+                                     style: AppTheme.bodyMedium.copyWith(
+                                       fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Text('Speed', style: AppTheme.caption),
+                                Text(_trainData!['speed'], 
+                                     style: AppTheme.bodyMedium.copyWith(
+                                       fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text('Arrival', style: AppTheme.caption),
+                                Text(_trainData!['arrivalTime'], 
+                                     style: AppTheme.bodyMedium.copyWith(
+                                       fontWeight: FontWeight.bold,
+                                       color: AppColors.teal)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 20),
+                      
                       // Route
                       Row(
                         children: [
@@ -314,10 +474,10 @@ class _PnrBookingScreenState extends State<PnrBookingScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('NDLS',
+                                Text(_trainData!['source'],
                                     style: AppTheme.heading2
                                         .copyWith(color: AppColors.grey)),
-                                Text('New Delhi', style: AppTheme.caption),
+                                Text(_trainData!['sourceName'], style: AppTheme.caption),
                                 const SizedBox(height: 4),
                                 Text('Mar 5, 20:15', style: AppTheme.bodySmall),
                               ],
@@ -338,21 +498,21 @@ class _PnrBookingScreenState extends State<PnrBookingScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                Text('SBC',
+                                Text(_trainData!['destination'],
                                     style: AppTheme.heading2
                                         .copyWith(color: AppColors.teal)),
-                                Text('KSR Bengaluru', style: AppTheme.caption),
+                                Text(_trainData!['destinationName'], style: AppTheme.caption),
                                 const SizedBox(height: 4),
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Text('13:40',
+                                    Text(_trainData!['scheduledArrival'],
                                         style: AppTheme.bodySmall.copyWith(
                                             decoration: TextDecoration
                                                 .lineThrough,
                                             color: AppColors.grey)),
                                     const SizedBox(width: 4),
-                                    Text('14:25',
+                                    Text(_trainData!['arrivalTime'],
                                         style: AppTheme.bodySmall.copyWith(
                                             color: AppColors.teal,
                                             fontWeight: FontWeight.bold)),
@@ -385,6 +545,8 @@ class _PnrBookingScreenState extends State<PnrBookingScreen> {
                     border: Border.all(color: AppColors.cardBorder),
                   ),
                   child: TextField(
+                    controller: _destinationController,
+                    onChanged: (_) => _updateSelectedDestinationEta(),
                     style: AppTheme.bodyMedium,
                     decoration: InputDecoration(
                       hintText: 'Enter drop location',
@@ -395,103 +557,135 @@ class _PnrBookingScreenState extends State<PnrBookingScreen> {
                   ),
                 ).animate().fadeIn(),
 
-                const SizedBox(height: 32),
-
-                // Ride Selection
-                Text('Choose Your Ride', style: AppTheme.bodyMedium)
-                    .animate()
-                    .fadeIn(),
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 120,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _categories.length,
-                    itemBuilder: (context, index) {
-                      final cat = _categories[index];
-                      final isSelected = _selectedCategoryIndex == index;
-                      return GestureDetector(
-                        onTap: () {
-                          setState(() => _selectedCategoryIndex = index);
-                        },
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          width: 100,
-                          margin: const EdgeInsets.only(right: 12),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.card,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: isSelected
-                                  ? AppColors.teal
-                                  : AppColors.cardBorder,
-                              width: isSelected ? 2 : 1,
-                            ),
-                            boxShadow: isSelected
-                                ? [
-                                    BoxShadow(
-                                      color: AppColors.teal
-                                          .withValues(alpha: 0.2),
-                                      blurRadius: 16,
-                                      spreadRadius: 2,
+                const SizedBox(height: 20),
+                GlassCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('ETA To Your Selected Destination',
+                          style: AppTheme.bodyMedium),
+                      const SizedBox(height: 8),
+                      if (_destinationController.text.trim().isEmpty)
+                        Text(
+                          'Enter destination to see train ETA for your stop.',
+                          style: AppTheme.bodySmall,
+                        )
+                      else
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _destinationController.text.trim(),
+                                    style: AppTheme.bodyMedium.copyWith(
+                                      fontWeight: FontWeight.w700,
                                     ),
-                                  ]
-                                : [],
-                          ),
-                          child: AnimatedScale(
-                            scale: isSelected ? 1.05 : 1.0,
-                            duration: const Duration(milliseconds: 200),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  cat.emoji,
-                                  style: const TextStyle(fontSize: 28),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  cat.name,
-                                  style: AppTheme.bodySmall.copyWith(
-                                    color: isSelected
-                                        ? AppColors.teal
-                                        : AppColors.white,
-                                    fontWeight: isSelected
-                                        ? FontWeight.w600
-                                        : FontWeight.w400,
                                   ),
-                                  textAlign: TextAlign.center,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  cat.priceRange,
-                                  style: AppTheme.caption.copyWith(
-                                    color: AppColors.grey,
-                                    fontSize: 10,
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    _etaToSelectedDestinationMin == null
+                                        ? 'ETA: calculating...'
+                                        : 'Train reaches in $_etaToSelectedDestinationMin min',
+                                    style: AppTheme.bodySmall,
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: AppColors.teal.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                _etaArrivalText,
+                                style: AppTheme.bodyMedium.copyWith(
+                                  color: AppColors.teal,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      );
-                    },
+                    ],
                   ),
-                ).animate().fadeIn(),
+                ).animate().fadeIn().slideY(begin: 0.1, end: 0),
 
-                const SizedBox(height: 32),
+                const SizedBox(height: 16),
+                GlassCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Plan Your Ride Mode', style: AppTheme.bodyMedium),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Choose bike, car, public transport, route-line, or share cab based on this ETA.',
+                        style: AppTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: const [
+                          _ModeChip(label: 'Bike', icon: Icons.two_wheeler_rounded),
+                          _ModeChip(label: 'Car', icon: Icons.directions_car_rounded),
+                          _ModeChip(label: 'Public', icon: Icons.directions_bus_rounded),
+                          _ModeChip(label: 'Route-Line', icon: Icons.route_rounded),
+                          _ModeChip(label: 'Share Cab', icon: Icons.people_alt_rounded),
+                        ],
+                      ),
+                    ],
+                  ),
+                ).animate().fadeIn().slideY(begin: 0.1, end: 0),
 
-                // Schedule Book Button
-                GradientButton(
-                  text: 'Schedule No Delay Cab',
-                  icon: Icons.flash_on_rounded,
-                  onPressed: _scheduleCab,
+                const SizedBox(height: 16),
+                GlassCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Cab Request Status', style: AppTheme.bodyMedium),
+                      const SizedBox(height: 8),
+                      Text(_requestStatus, style: AppTheme.bodySmall),
+                      const SizedBox(height: 14),
+                      Text('Passenger Notification', style: AppTheme.bodyMedium),
+                      const SizedBox(height: 8),
+                      Text(_passengerNotification, style: AppTheme.bodySmall),
+                    ],
+                  ),
                 ).animate().fadeIn().slideY(begin: 0.1, end: 0),
               ],
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ModeChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  const _ModeChip({required this.label, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: AppColors.teal, size: 14),
+          const SizedBox(width: 6),
+          Text(label, style: AppTheme.bodySmall),
+        ],
       ),
     );
   }

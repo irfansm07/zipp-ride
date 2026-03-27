@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../models/driver_model.dart';
 import '../widgets/glass_card.dart';
 import 'main_navigation.dart';
+import 'active_ride_screen.dart';
 
 class BookingConfirmationScreen extends StatefulWidget {
   final DriverModel driver;
@@ -40,6 +41,10 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
   Timer? _timer;
   late AnimationController _checkController;
   late Animation<double> _checkAnimation;
+  
+  late String _currentDestination;
+  String? _appliedCoupon;
+  double _discountAmount = 0.0;
 
   final _paymentMethods = [
     {'icon': Icons.money_rounded, 'label': 'Cash', 'emoji': '💵'},
@@ -50,6 +55,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
   @override
   void initState() {
     super.initState();
+    _currentDestination = widget.destination;
     _checkController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
@@ -70,6 +76,10 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
     setState(() => _isBooked = true);
     _checkController.forward();
     _startCountdown();
+    
+    // Wire up global state
+    RideState.hasActiveRide.value = true;
+    MainNavigation.currentTab.value = 1; // 1 = My Ride tab
   }
 
   void _startCountdown() {
@@ -90,6 +100,85 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
 
   double get _splitFare {
     return widget.driver.price * 0.6;
+  }
+  
+  double get _finalFare {
+    double baseFare = widget.isShareCab ? _splitFare : widget.driver.price;
+    double total = baseFare - _discountAmount;
+    if (total < 50) total = 50; // Minimum fare
+    return total;
+  }
+
+  void _editLocation() {
+    final controller = TextEditingController(text: _currentDestination);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: Text('Edit Drop Location', style: AppTheme.heading3),
+        content: TextField(
+          controller: controller,
+          decoration: InputDecoration(
+            hintText: 'Enter new destination',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (controller.text.trim().isNotEmpty) {
+                setState(() => _currentDestination = controller.text.trim());
+              }
+              Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.teal),
+            child: const Text('Save', style: TextStyle(color: AppColors.background)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _applyCoupon() {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: Text('Apply Coupon', style: AppTheme.heading3),
+        content: TextField(
+          controller: controller,
+          textCapitalization: TextCapitalization.characters,
+          decoration: InputDecoration(
+            hintText: 'e.g. ZIPP50',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (controller.text.trim().isNotEmpty) {
+                setState(() {
+                  _appliedCoupon = controller.text.trim().toUpperCase();
+                  _discountAmount = 50.0; // Flat discount
+                });
+              }
+              Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.teal),
+            child: const Text('Apply', style: TextStyle(color: AppColors.background)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -120,7 +209,7 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(Icons.arrow_back_rounded,
-                          color: AppColors.white, size: 20),
+                          color: AppColors.darkGrey, size: 20),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -184,11 +273,40 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                             AppColors.teal,
                           ),
                           _buildDivider(),
-                          _buildSummaryRow(
-                            Icons.location_on_rounded,
-                            'Drop',
-                            widget.destination,
-                            AppColors.pink,
+                          // Drop location with Edit button
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.pink.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.location_on_rounded, color: AppColors.pink, size: 18),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Drop', style: AppTheme.bodySmall),
+                                    Text(_currentDestination, style: AppTheme.bodyMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                  ],
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: _editLocation,
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surface,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: AppColors.cardBorder),
+                                  ),
+                                  child: const Icon(Icons.edit_rounded, color: AppColors.teal, size: 16),
+                                ),
+                              ),
+                            ],
                           ),
                           _buildDivider(),
                           _buildSummaryRow(
@@ -287,15 +405,23 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                                           ),
                                           const SizedBox(width: 8),
                                           Text(
-                                            '₹${_splitFare.toInt()} (split)',
+                                            '₹${_finalFare.toInt()}',
                                             style: AppTheme.heading3
                                                 .copyWith(color: AppColors.teal),
                                           ),
                                         ] else
                                           Text(
-                                            '₹${widget.driver.price.toInt()}',
+                                            '₹${_finalFare.toInt()}',
                                             style: AppTheme.heading3
                                                 .copyWith(color: AppColors.teal),
+                                          ),
+                                        if (_appliedCoupon != null)
+                                          Padding(
+                                            padding: const EdgeInsets.only(left: 8),
+                                            child: Text(
+                                              '-₹${_discountAmount.toInt()} 🎉',
+                                              style: AppTheme.caption.copyWith(color: AppColors.pink, fontWeight: FontWeight.bold),
+                                            ),
                                           ),
                                       ],
                                     ),
@@ -310,6 +436,53 @@ class _BookingConfirmationScreenState extends State<BookingConfirmationScreen>
                         .animate(delay: 300.ms)
                         .fadeIn(duration: 400.ms)
                         .slideY(begin: 0.1, end: 0),
+
+                    const SizedBox(height: 24),
+                    
+                    // Coupon Section
+                    GestureDetector(
+                      onTap: _applyCoupon,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: _appliedCoupon != null ? AppColors.success.withValues(alpha: 0.1) : AppColors.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: _appliedCoupon != null ? AppColors.success : AppColors.cardBorder,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.local_offer_rounded, 
+                                 color: _appliedCoupon != null ? AppColors.success : AppColors.pink, 
+                                 size: 22),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _appliedCoupon != null ? 'Coupon Applied!' : 'Apply Coupon',
+                                    style: AppTheme.bodyMedium.copyWith(
+                                      color: _appliedCoupon != null ? AppColors.success : null,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  Text(
+                                    _appliedCoupon != null ? '$_appliedCoupon (-₹${_discountAmount.toInt()})' : 'Save more on this ride',
+                                    style: AppTheme.caption.copyWith(
+                                      color: _appliedCoupon != null ? AppColors.success : AppColors.grey,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(Icons.chevron_right_rounded, color: AppColors.grey),
+                          ],
+                        ),
+                      ),
+                    ).animate(delay: 350.ms).fadeIn(),
 
                     const SizedBox(height: 24),
 

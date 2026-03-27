@@ -4,6 +4,8 @@ import '../theme/app_theme.dart';
 import '../models/driver_model.dart';
 import '../widgets/glass_card.dart';
 import 'booking_confirmation_screen.dart';
+import 'main_navigation.dart';
+import 'active_ride_screen.dart';
 
 class RideOptionsScreen extends StatefulWidget {
   final String rideType;
@@ -54,6 +56,15 @@ class _RideOptionsScreenState extends State<RideOptionsScreen> {
           if (ctx.mounted) {
             Navigator.pop(ctx);
             setState(() => _rideAccepted = true);
+            
+            // Navigate to active rides after brief delay
+            Future.delayed(const Duration(seconds: 1), () {
+              if (mounted) {
+                RideState.hasActiveRide.value = true;
+                MainNavigation.currentTab.value = 1;
+                Navigator.popUntil(context, (route) => route.isFirst);
+              }
+            });
           }
         });
 
@@ -122,7 +133,7 @@ class _RideOptionsScreenState extends State<RideOptionsScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(Icons.arrow_back_rounded,
-                          color: AppColors.white, size: 20),
+                          color: AppColors.darkGrey, size: 20),
                     ),
                   ),
                   const SizedBox(width: 8),
